@@ -1,15 +1,17 @@
 import pandas as pd
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from pathlib import Path
 
-# Load dataset
-df = pd.read_excel("dataset/college_faq.xlsx")
-
-# Load AI model
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# Load the dataset relative to this file so it works from any deployment folder.
+BASE_DIR = Path(__file__).resolve().parent
+df = pd.read_excel(BASE_DIR / "dataset" / "college_faq.xlsx")
 
 questions = df["Question"].tolist()
-embeddings = model.encode(questions)
+# A lightweight local matcher keeps startup fast and avoids downloading a large
+# model when the Render service starts.
+vectorizer = TfidfVectorizer(stop_words="english")
+question_vectors = vectorizer.fit_transform(questions)
 
 # Financial amount keywords
 financial_keywords = [
@@ -64,9 +66,8 @@ def get_answer(user_question):
                 "other financial matters, please contact the College Accounts/Finance Department."
             )
 
-    user_embedding = model.encode([user_question])
-
-    similarity = cosine_similarity(user_embedding, embeddings)
+    user_vector = vectorizer.transform([user_question])
+    similarity = cosine_similarity(user_vector, question_vectors)
 
     best_score = similarity.max()
     best_index = similarity.argmax()
